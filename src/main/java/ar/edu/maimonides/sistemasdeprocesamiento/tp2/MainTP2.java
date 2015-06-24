@@ -3,11 +3,14 @@ package ar.edu.maimonides.sistemasdeprocesamiento.tp2;
 import ar.edu.maimonides.sistemasdeprocesamiento.tp2.dtos.Estadistica;
 import ar.edu.maimonides.sistemasdeprocesamiento.tp2.dtos.Movimiento;
 import ar.edu.maimonides.sistemasdeprocesamiento.tp2.dtos.Saldo;
+import org.glassfish.jersey.client.ClientResponse;
 
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.client.WebTarget;
+import javax.ws.rs.core.GenericType;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -22,10 +25,17 @@ import java.util.UUID;
  * http://localhost:8080/tp2/apirest/calcular/estadisticas (GET)
  * http://localhost:8080/tp2/apirest/calcular/cuentaspasadas (GET)
  *
- * Created by simetrias on 16/06/2015.
  */
 public class MainTP2 {
 
+    private static final int CANT_REGISTROS = 1000;
+    private static String hostGianella = "192.168.1.118";
+    private static String hostRach = "192.168.1.119";
+    private static String hostChris = "192.168.1.110";
+    private static String hostHernan = "192.168.1.114";
+    private static String hostLidia = "192.168.1.116";
+
+    private static String hostActual = hostRach;
     public static void main(String[] args) {
 
         System.out.println("Creando movimientos");
@@ -46,14 +56,14 @@ public class MainTP2 {
 
         System.out.println("Solicitando saldos al server");
         Client client = ClientBuilder.newClient();
-        WebTarget target = client.target("http://localhost:8080").path("/tp2/apirest/calcular/estadisticas");
+        WebTarget target = client.target("http://"+hostActual+":8080").path("/tp2/apirest/calcular/estadisticas");
 
         Response response = target.request().get();
 
         if (response.getStatus() != 200)  {
             System.out.println("ERROR - Al solicitar estadísticas - status: " + response.getStatus());
         }
-        List<Estadistica> estadisticas = (List<Estadistica>) response.getEntity();
+        List<Estadistica> estadisticas = (List<Estadistica>) response.readEntity(new GenericType<List<Estadistica>>() {});
         System.out.println("Se obtuvieron " + estadisticas.size() + " estadísticas");
 
         for (Estadistica estaditica : estadisticas) {
@@ -68,14 +78,14 @@ public class MainTP2 {
 
         System.out.println("Solicitando cuentas pasadas al server");
         Client client = ClientBuilder.newClient();
-        WebTarget target = client.target("http://localhost:8080").path("/tp2/apirest/calcular/cuentaspasadas");
+        WebTarget target = client.target("http://"+hostActual+":8080").path("/tp2/apirest/calcular/cuentaspasadas");
 
         Response response = target.request().get();
 
         if (response.getStatus() != 200)  {
             System.out.println("ERROR - Al solicitar cuenta pasada - status: " + response.getStatus());
         }
-        List<Saldo> saldos = (List<Saldo>) response.getEntity();
+        List<Saldo> saldos = (List<Saldo>) response.readEntity(new GenericType<List<Saldo>>() {});
         System.out.println("Se obtuvieron " + saldos.size() + " cuentas pasadas");
         for (Saldo saldo : saldos) {
             System.out.println("UUID: "+  saldo.getUuid() + " - SALDO: " + saldo.getSaldo());
@@ -87,14 +97,14 @@ public class MainTP2 {
     private static void pedirSaldos() {
         System.out.println("Solicitando saldos al server");
         Client client = ClientBuilder.newClient();
-        WebTarget target = client.target("http://localhost:8080").path("/tp2/apirest/calcular/saldos");
+        WebTarget target = client.target("http://"+hostActual+":8080").path("/tp2/apirest/calcular/saldos");
 
         Response response = target.request().get();
 
         if (response.getStatus() != 200)  {
             System.out.println("ERROR - Al solicitar saldo status: " + response.getStatus());
         }
-        List<Saldo> saldos = (List<Saldo>) response.getEntity();
+        List<Saldo> saldos = (List<Saldo>) response.readEntity(new GenericType<List<Saldo>>(){});
         System.out.println("Se obtuvieron " + saldos.size() + " saldos");
         for (Saldo saldo : saldos) {
             System.out.println("UUID: "+  saldo.getUuid() + " - SALDO: " + saldo.getSaldo());
@@ -107,16 +117,17 @@ public class MainTP2 {
         System.out.println("Enviando " + movimientos.size() + " movimientos al calculador");
         Client client = ClientBuilder.newClient();
 
-        WebTarget target = client.target("http://localhost:8080").path("/tp2/apirest/calcular/registro");
+        WebTarget target = client.target("http://"+hostActual+":8080").path("/tp2/apirest/calcular/registro");
 
+        int count = 0;
         int cantErrores = 0;
         for (Movimiento movimiento : movimientos) {
 
             try {
-                Response response = target.request().post(Entity.json(movimiento));
+                Response response = target.request(MediaType.APPLICATION_JSON_TYPE).post(Entity.json(movimiento));
 
                 if (response.getStatus() != 200) {
-                    System.out.println("ERROR - STATUS NO ES 200 AL POSTEAR MOVIMIENTOS");
+                    System.out.println("ERROR - STATUS NO ES 200 AL POSTEAR MOVIMIENTOS  " + response.getStatus());
                     cantErrores++;
                 }
 
@@ -125,6 +136,9 @@ public class MainTP2 {
                 cantErrores++;
             }
 
+            if (count++ % 100 == 0) {
+                System.out.println("Enviado movimiento " + count);
+            }
         }
 
         if (cantErrores != 0){
@@ -141,7 +155,7 @@ public class MainTP2 {
 
         List<Movimiento> result = new ArrayList<Movimiento>();
 
-        for (int i = 0; i < 1000000; i++) {
+        for (int i = 0; i < CANT_REGISTROS; i++) {
             Cliente c = clientes.get(i % 50);
             Movimiento m = new Movimiento();
             m.setNombre(c.nombre);
@@ -156,7 +170,7 @@ public class MainTP2 {
                 m.setDebitos(new BigDecimal(0));
                 m.setCreditos(new BigDecimal(monto()));
             }
-            m.setTope(new BigDecimal(20000));
+            m.setTope(new BigDecimal(200));
             result.add(m);
         }
         return result;
